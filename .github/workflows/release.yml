@@ -1,0 +1,47 @@
+# Release: on a v* tag, run the tests and attach a zip holding the signed
+# abletonMoveSchwung/ folder, install.sh, the README and the licence. The .ini
+# is signed before tagging (build.py needs inMusic's salt, which is not in
+# this repository), so this only checks that the pair is complete.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lua
+        run: sudo apt-get update -q && sudo apt-get install -y -q lua5.4
+
+      - name: Tests
+        run: lua5.4 test/run.lua
+
+      - name: The .ini names the .lua and carries a checksum
+        run: |
+          ini=abletonMoveSchwung/abletonMoveSchwung.ini
+          head -n 1 "$ini" | grep -qx '\[info\]'
+          grep -qx 'script=abletonMoveSchwung.lua' "$ini"
+          grep -qx 'scriptVersion=1.0' "$ini"
+          grep -qE '^checksum=[0-9a-f]{64}$' "$ini"
+
+      - name: Package
+        run: |
+          name="mpc-control-script-move-${GITHUB_REF_NAME}"
+          mkdir -p "dist/$name"
+          cp -R abletonMoveSchwung install.sh README.md LICENSE "dist/$name/"
+          (cd dist && zip -qr "$name.zip" "$name")
+          echo "ZIP=dist/$name.zip" >> "$GITHUB_ENV"
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP }}
+          generate_release_notes: true

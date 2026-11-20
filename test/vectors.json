@@ -1,0 +1,1302 @@
+{
+ "_comment": "Byte-exact examples of the wire protocol v4. 'wire' is the full MIDI message including F0/F7 for SysEx. Both test suites replay these.",
+ "move_to_mpc": [
+  {
+   "name": "hello",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    1,
+    4,
+    0,
+    247
+   ]
+  },
+  {
+   "name": "ping",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    2,
+    247
+   ]
+  },
+  {
+   "name": "bye",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    3,
+    247
+   ]
+  },
+  {
+   "name": "pad 0 (bottom-left, Move note 68) down vel 100",
+   "wire": [
+    159,
+    0,
+    100
+   ]
+  },
+  {
+   "name": "pad 31 (top-right, Move note 99) up",
+   "wire": [
+    143,
+    31,
+    0
+   ]
+  },
+  {
+   "name": "pad 12 pressure 64",
+   "wire": [
+    175,
+    12,
+    64
+   ]
+  },
+  {
+   "name": "knob 0 one step clockwise",
+   "wire": [
+    191,
+    71,
+    1
+   ]
+  },
+  {
+   "name": "knob 7 two steps counter-clockwise",
+   "wire": [
+    191,
+    78,
+    126
+   ]
+  },
+  {
+   "name": "knob 3 touched",
+   "wire": [
+    159,
+    67,
+    127
+   ]
+  },
+  {
+   "name": "knob 3 released",
+   "wire": [
+    143,
+    67,
+    0
+   ]
+  },
+  {
+   "name": "NAV_RIGHT press",
+   "wire": [
+    191,
+    2,
+    127
+   ]
+  },
+  {
+   "name": "SHIFT release",
+   "wire": [
+    191,
+    5,
+    0
+   ]
+  },
+  {
+   "name": "ROW 0 (top) press",
+   "wire": [
+    191,
+    16,
+    127
+   ]
+  },
+  {
+   "name": "STEP 15 press",
+   "wire": [
+    191,
+    47,
+    127
+   ]
+  },
+  {
+   "name": "SET_MODE play side (auto)",
+   "wire": [
+    191,
+    48,
+    2
+   ]
+  },
+  {
+   "name": "SET_QLINK_PAGE 9-16",
+   "wire": [
+    191,
+    49,
+    1
+   ]
+  },
+  {
+   "name": "SET_QLINK_PAGE Col 1-2",
+   "wire": [
+    191,
+    49,
+    2
+   ]
+  },
+  {
+   "name": "SET_QLINK_PAGE Col 3-4",
+   "wire": [
+    191,
+    49,
+    3
+   ]
+  },
+  {
+   "name": "SET_PAD_BANK C|D",
+   "wire": [
+    191,
+    50,
+    2
+   ]
+  },
+  {
+   "name": "REFRESH",
+   "wire": [
+    191,
+    51,
+    127
+   ]
+  },
+  {
+   "name": "MODE",
+   "wire": [
+    191,
+    13,
+    127
+   ]
+  },
+  {
+   "name": "NOTE_REPEAT",
+   "wire": [
+    191,
+    14,
+    127
+   ]
+  },
+  {
+   "name": "ARM",
+   "wire": [
+    191,
+    15,
+    127
+   ]
+  },
+  {
+   "name": "COPY",
+   "wire": [
+    191,
+    20,
+    127
+   ]
+  },
+  {
+   "name": "DELETE",
+   "wire": [
+    191,
+    21,
+    127
+   ]
+  },
+  {
+   "name": "AUTOMATION",
+   "wire": [
+    191,
+    22,
+    127
+   ]
+  },
+  {
+   "name": "JOG_TOUCH",
+   "wire": [
+    191,
+    23,
+    127
+   ]
+  },
+  {
+   "name": "TEMPO",
+   "wire": [
+    191,
+    52,
+    1
+   ]
+  },
+  {
+   "name": "NOTE_REPEAT release",
+   "wire": [
+    191,
+    14,
+    0
+   ]
+  },
+  {
+   "name": "JOG_TOUCH release",
+   "wire": [
+    191,
+    23,
+    0
+   ]
+  },
+  {
+   "name": "METRONOME shifted step",
+   "wire": [
+    191,
+    37,
+    127
+   ]
+  },
+  {
+   "name": "SIXTEEN_LEVEL shifted step",
+   "wire": [
+    191,
+    44,
+    127
+   ]
+  },
+  {
+   "name": "FULL_LEVEL shifted step",
+   "wire": [
+    191,
+    41,
+    127
+   ]
+  },
+  {
+   "name": "STEP_SEQ press",
+   "wire": [
+    191,
+    24,
+    127
+   ]
+  },
+  {
+   "name": "STEP_SEQ release",
+   "wire": [
+    191,
+    24,
+    0
+   ]
+  },
+  {
+   "name": "MUTE",
+   "wire": [
+    191,
+    25,
+    127
+   ]
+  },
+  {
+   "name": "ARRANGE",
+   "wire": [
+    191,
+    26,
+    127
+   ]
+  },
+  {
+   "name": "DUP_CLIP press",
+   "wire": [
+    191,
+    27,
+    127
+   ]
+  },
+  {
+   "name": "DUP_CLIP release",
+   "wire": [
+    191,
+    27,
+    0
+   ]
+  },
+  {
+   "name": "MAIN press",
+   "wire": [
+    191,
+    28,
+    127
+   ]
+  },
+  {
+   "name": "MAIN release",
+   "wire": [
+    191,
+    28,
+    0
+   ]
+  },
+  {
+   "name": "QUANTISE_ALWAYS press",
+   "wire": [
+    191,
+    29,
+    127
+   ]
+  },
+  {
+   "name": "QUANTISE_ALWAYS release",
+   "wire": [
+    191,
+    29,
+    0
+   ]
+  }
+ ],
+ "mpc_to_move": [
+  {
+   "name": "welcome v4, clip workflow available",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    65,
+    4,
+    1,
+    247
+   ],
+   "decoded": {
+    "type": "welcome",
+    "ver": 4,
+    "flags": 1,
+    "clipWorkflow": true
+   }
+  },
+  {
+   "name": "state: Session, qlink page 0, bank 0, playing, origin 2,5, matrix 16x32, can move left+right+down",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    0,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    3,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 0,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": true,
+    "noteRepeat": true,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0
+   }
+  },
+  {
+   "name": "pads 8..9: full red solid, half green slow pulse",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    67,
+    8,
+    2,
+    127,
+    0,
+    0,
+    0,
+    0,
+    63,
+    0,
+    2,
+    247
+   ],
+   "decoded": {
+    "first": 8,
+    "pads": [
+     {
+      "r": 127,
+      "g": 0,
+      "b": 0,
+      "anim": 0
+     },
+     {
+      "r": 0,
+      "g": 63,
+      "b": 0,
+      "anim": 2
+     }
+    ]
+   }
+  },
+  {
+   "name": "rows: white, off, off, blue blink",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    68,
+    127,
+    127,
+    127,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    127,
+    3,
+    247
+   ]
+  },
+  {
+   "name": "steps 0..1: dim white, off",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    69,
+    0,
+    2,
+    127,
+    127,
+    127,
+    1,
+    0,
+    0,
+    0,
+    0,
+    247
+   ]
+  },
+  {
+   "name": "text slot 0 'Drum 001'",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    70,
+    0,
+    68,
+    114,
+    117,
+    109,
+    32,
+    48,
+    48,
+    49,
+    247
+   ],
+   "decoded": {
+    "slot": 0,
+    "text": "Drum 001"
+   }
+  },
+  {
+   "name": "qlink knob 2 'Cutoff' = '1.2 kHz'",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    71,
+    2,
+    67,
+    117,
+    116,
+    111,
+    102,
+    102,
+    0,
+    49,
+    46,
+    50,
+    32,
+    107,
+    72,
+    122,
+    247
+   ],
+   "decoded": {
+    "knob": 2,
+    "name": "Cutoff",
+    "value": "1.2 kHz"
+   }
+  },
+  {
+   "name": "goodbye",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    72,
+    247
+   ]
+  },
+  {
+   "name": "pong",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    73,
+    247
+   ]
+  },
+  {
+   "name": "position: 1 quarter in a two-bar loop, 4/4",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    74,
+    64,
+    7,
+    0,
+    0,
+    0,
+    60,
+    0,
+    0,
+    4,
+    4,
+    247
+   ],
+   "decoded": {
+    "type": "position",
+    "position": 960,
+    "length": 7680,
+    "numerator": 4,
+    "denominator": 4
+   }
+  },
+  {
+   "name": "track list slot 3",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    70,
+    3,
+    66,
+    97,
+    115,
+    115,
+    247
+   ],
+   "decoded": {
+    "type": "text",
+    "slot": 3,
+    "text": "Bass"
+   }
+  },
+  {
+   "name": "track list slot 4",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    70,
+    4,
+    68,
+    114,
+    117,
+    109,
+    115,
+    247
+   ],
+   "decoded": {
+    "type": "text",
+    "slot": 4,
+    "text": "Drums"
+   }
+  },
+  {
+   "name": "track list slot 5",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    70,
+    5,
+    83,
+    121,
+    110,
+    116,
+    104,
+    247
+   ],
+   "decoded": {
+    "type": "text",
+    "slot": 5,
+    "text": "Synth"
+   }
+  },
+  {
+   "name": "state: column page 2 (Col 1-2)",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    2,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    3,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 2,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": true,
+    "noteRepeat": true,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0
+   }
+  },
+  {
+   "name": "state: column page 3 (Col 3-4)",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    3,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    3,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 3,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": true,
+    "noteRepeat": true,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0
+   }
+  },
+  {
+   "name": "state: Step Seq in Pads, navigation left+right",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    2,
+    0,
+    2,
+    0,
+    0,
+    0,
+    16,
+    32,
+    3,
+    0,
+    1,
+    31,
+    48,
+    9,
+    1,
+    247
+   ],
+   "decoded": {
+    "mode": 2,
+    "padBank": 2,
+    "mpcMode": 1,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": false
+   }
+  },
+  {
+   "name": "steps 0..2: Step Seq note, empty, playhead",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    69,
+    0,
+    3,
+    127,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    127,
+    0,
+    0,
+    247
+   ],
+   "decoded": {
+    "first": 0,
+    "steps": [
+     {
+      "r": 127,
+      "g": 0,
+      "b": 0,
+      "anim": 0
+     },
+     {
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "anim": 0
+     },
+     {
+      "r": 0,
+      "g": 127,
+      "b": 0,
+      "anim": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "text slot 1 'Drum'",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    70,
+    1,
+    68,
+    114,
+    117,
+    109,
+    247
+   ],
+   "decoded": {
+    "slot": 1,
+    "text": "Drum"
+   }
+  },
+  {
+   "name": "state: muted",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    0,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    32,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 0,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": false,
+    "noteRepeat": false,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0,
+    "popup": false,
+    "aux": false,
+    "muted": true,
+    "solo": false
+   }
+  },
+  {
+   "name": "state: solo",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    0,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    64,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 0,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": false,
+    "noteRepeat": false,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0,
+    "popup": false,
+    "aux": false,
+    "muted": false,
+    "solo": true
+   }
+  },
+  {
+   "name": "state: mute solo arm",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    66,
+    0,
+    0,
+    0,
+    1,
+    2,
+    5,
+    16,
+    32,
+    11,
+    97,
+    2,
+    31,
+    48,
+    9,
+    0,
+    247
+   ],
+   "decoded": {
+    "mode": 0,
+    "qlinkPage": 0,
+    "padBank": 0,
+    "playing": true,
+    "recording": false,
+    "overdubbing": false,
+    "originX": 2,
+    "originY": 5,
+    "globalCols": 16,
+    "globalRows": 32,
+    "canLeft": true,
+    "canRight": true,
+    "canUp": false,
+    "canDown": true,
+    "armed": true,
+    "noteRepeat": false,
+    "metronome": false,
+    "automation": 2,
+    "available": 31,
+    "bpm": 120,
+    "mpcMode": 0,
+    "popup": false,
+    "aux": false,
+    "muted": true,
+    "solo": true
+   }
+  }
+ ],
+ "coordinates": [
+  {
+   "mode": 0,
+   "moveRow": 3,
+   "moveCol": 0,
+   "pad": 24,
+   "clipColumn": 0,
+   "clipRow": 0
+  },
+  {
+   "mode": 0,
+   "moveRow": 0,
+   "moveCol": 7,
+   "pad": 7,
+   "clipColumn": 7,
+   "clipRow": 3
+  },
+  {
+   "mode": 1,
+   "moveRow": 3,
+   "moveCol": 0,
+   "pad": 24,
+   "clipColumn": 0,
+   "clipRow": 0
+  },
+  {
+   "mode": 1,
+   "moveRow": 0,
+   "moveCol": 7,
+   "pad": 7,
+   "clipColumn": 3,
+   "clipRow": 7
+  },
+  {
+   "mode": 2,
+   "padBank": 0,
+   "moveRow": 0,
+   "moveCol": 0,
+   "pad": 0,
+   "virtualPad": 0
+  },
+  {
+   "mode": 2,
+   "padBank": 0,
+   "moveRow": 3,
+   "moveCol": 3,
+   "pad": 27,
+   "virtualPad": 15
+  },
+  {
+   "mode": 2,
+   "padBank": 0,
+   "moveRow": 0,
+   "moveCol": 4,
+   "pad": 4,
+   "virtualPad": 16
+  },
+  {
+   "mode": 2,
+   "padBank": 2,
+   "moveRow": 3,
+   "moveCol": 7,
+   "pad": 31,
+   "virtualPad": 63
+  }
+ ],
+ "version_mismatch": {
+  "hello_v1": [
+   240,
+   125,
+   77,
+   80,
+   1,
+   1,
+   0,
+   247
+  ],
+  "welcome_v1": [
+   240,
+   125,
+   77,
+   80,
+   65,
+   1,
+   1,
+   247
+  ],
+  "goodbye": [
+   240,
+   125,
+   77,
+   80,
+   72,
+   247
+  ],
+  "hello_v2": [
+   240,
+   125,
+   77,
+   80,
+   1,
+   2,
+   0,
+   247
+  ],
+  "welcome_v2": [
+   240,
+   125,
+   77,
+   80,
+   65,
+   2,
+   1,
+   247
+  ],
+  "hello_v3": [
+   240,
+   125,
+   77,
+   80,
+   1,
+   3,
+   0,
+   247
+  ],
+  "welcome_v3": [
+   240,
+   125,
+   77,
+   80,
+   65,
+   3,
+   1,
+   247
+  ]
+ },
+ "qlink_pages": [
+  [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  [
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15
+  ],
+  [
+   12,
+   8,
+   4,
+   0,
+   13,
+   9,
+   5,
+   1
+  ],
+  [
+   14,
+   10,
+   6,
+   2,
+   15,
+   11,
+   7,
+   3
+  ]
+ ],
+ "step_seq": [
+  {
+   "name": "first step tap",
+   "wire": [
+    191,
+    32,
+    127
+   ],
+   "call": "stepSequencer.Tap",
+   "args": [
+    1
+   ]
+  },
+  {
+   "name": "last step tap",
+   "wire": [
+    191,
+    47,
+    127
+   ],
+   "call": "stepSequencer.Tap",
+   "args": [
+    16
+   ]
+  },
+  {
+   "name": "step release",
+   "wire": [
+    191,
+    47,
+    0
+   ]
+  },
+  {
+   "name": "previous bar",
+   "wire": [
+    191,
+    1,
+    127
+   ],
+   "call": "stepSeqPrev",
+   "args": []
+  },
+  {
+   "name": "next bar",
+   "wire": [
+    191,
+    2,
+    127
+   ],
+   "call": "stepSeqNext",
+   "args": []
+  },
+  {
+   "name": "nav release",
+   "wire": [
+    191,
+    2,
+    0
+   ]
+  },
+  {
+   "name": "up ignored",
+   "wire": [
+    191,
+    3,
+    127
+   ]
+  },
+  {
+   "name": "down ignored",
+   "wire": [
+    191,
+    4,
+    127
+   ]
+  }
+ ]
+}
