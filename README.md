@@ -137,6 +137,26 @@ protocol's examples from
 [move-mpc-control](https://github.com/ryanmgilmore/move-mpc-control/blob/main/protocol/vectors.json);
 keep the two in step.
 
+## Changelog
+
+Release this script and the [Move MPC Control](https://github.com/ryanmgilmore/move-mpc-control)
+module at the same version: they refuse to connect across protocol versions.
+The module's README has the full changelog.
+
+### v0.3.0 (2026-11-23)
+
+- Protocol 5: notes on steps from the Move (written into the MPC's selected
+  clip, in either workflow), a new clip on a double tap, and Step Seq's knob
+  parameter for the Move's screen.
+
+### v0.2.0
+
+Not released: its features ship in v0.3.0.
+
+### v0.1.0 (2026-11-19)
+
+First release.
+
 ## About this project
 
 Move MPC Control and this script are designed and tested by Ryan Gilmore, on

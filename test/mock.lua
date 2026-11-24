@@ -352,6 +352,10 @@ function M.new(opts)
                 w.cells[dc] = w.cells[dc] or {}; local src = w.cells[c] and w.cells[c][r] or {0, 2, false}
                 w.cells[dc][dr] = {src[1], src[2], false}; w.selectedCol, w.selectedRow = dc, dr; w.refresh()
             end),
+            CreateClip = mapFn("CreateClip", function(c, r)
+                if w.createClipFails then error("CreateClip failed") end
+                w.cells[c] = w.cells[c] or {}; w.cells[c][r] = {0, 2, false}; w.refresh()
+            end),
             ClipIsPlaying = mapFn("ClipIsPlaying", function(c, r) return w.playingClip ~= nil and w.playingClip[1] == c and w.playingClip[2] == r end),
             TriggerClip = mapFn("clipMatrix.TriggerClip", function() end),
             DeleteClip = mapFn("DeleteClip", function(c, r) if w.cells[c] then w.cells[c][r] = nil end; w.refresh() end),
@@ -401,6 +405,47 @@ function M.new(opts)
             record = { Press = mapFn("record.Press", function() end) } },
         ui = { ShowTUIFeedback = mapFn("ShowTUIFeedback", function() end) },
     }
+    -- selectedClip.events: per clip "c,r" a set of live note strings. An edit
+    -- must pass the newest string (the old one dies with each edit); a stale
+    -- one is counted in w.staleEvents and changes nothing, as on the device.
+    -- w.notesOf(c, r) lists the live notes as { note, time, vel, len }.
+    w.liveEvents, w.staleEvents, w.eventSeq = {}, 0, 0
+    local function eventsFor(key)
+        local live = w.liveEvents[key] or {}
+        w.liveEvents[key] = live
+        local function enc(n) w.eventSeq = w.eventSeq + 1; return string.format("ev%d:%d,%d,%.4f,%d", w.eventSeq, n.note, n.time, n.vel, n.len) end
+        local function find(ev)
+            local n = live[ev]
+            if not n then w.staleEvents = w.staleEvents + 1 end
+            return n
+        end
+        return {
+            CreateNoteEvent = mapFn("CreateNoteEvent", function(note, time, vel, len, prob)
+                local n = { note = note, time = time, vel = vel, len = len, prob = prob }
+                local ev = enc(n); live[ev] = n; return ev
+            end),
+            SetEventEnd = mapFn("SetEventEnd", function(ev, e)
+                local n = find(ev); if not n then return ev end
+                live[ev] = nil; n.len = e - n.time
+                local new = enc(n); live[new] = n; return new
+            end),
+            DeleteEvent = mapFn("DeleteEvent", function(ev)
+                if find(ev) then live[ev] = nil end
+            end),
+        }
+    end
+    function w.notesOf(c, r)
+        local out = {}
+        for _, n in pairs(w.liveEvents[c .. "," .. r] or {}) do out[#out + 1] = n end
+        table.sort(out, function(x, y) if x.time ~= y.time then return x.time < y.time end return x.note < y.note end)
+        return out
+    end
+    setmetatable(w.mpc.clipMatrix, { __index = function(_, k)
+        if k == "selectedClip" then
+            if w.noSelectedClip then return nil end
+            return { events = eventsFor(w.selectedCol .. "," .. w.selectedRow) }
+        end
+    end })
     w.mpc.engineMode.RequestModeChange = mapFn("RequestModeChange", function(name)
         M.set(w.mpc.engineMode.CurrentMode, name)
     end)

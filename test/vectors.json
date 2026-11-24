@@ -1,5 +1,5 @@
 {
- "_comment": "Byte-exact examples of the wire protocol v4. 'wire' is the full MIDI message including F0/F7 for SysEx. Both test suites replay these.",
+ "_comment": "Byte-exact examples of the wire protocol v4. 'wire' is the full MIDI message including F0/F7 for SysEx. Both test suites replay these. note_entry (v5, the wire protocol \u00a712): wire, decoded, and the MPC call each causes; args are note, pulses, normalised velocity, length pulses, probability.",
  "move_to_mpc": [
   {
    "name": "hello",
@@ -9,7 +9,7 @@
     77,
     80,
     1,
-    4,
+    5,
     0,
     247
    ]
@@ -359,20 +359,20 @@
  ],
  "mpc_to_move": [
   {
-   "name": "welcome v4, clip workflow available",
+   "name": "welcome v5, clip workflow available",
    "wire": [
     240,
     125,
     77,
     80,
     65,
-    4,
+    5,
     1,
     247
    ],
    "decoded": {
     "type": "welcome",
-    "ver": 4,
+    "ver": 5,
     "flags": 1,
     "clipWorkflow": true
    }
@@ -1177,6 +1177,26 @@
    3,
    1,
    247
+  ],
+  "hello_v4": [
+   240,
+   125,
+   77,
+   80,
+   1,
+   4,
+   0,
+   247
+  ],
+  "welcome_v4": [
+   240,
+   125,
+   77,
+   80,
+   65,
+   4,
+   1,
+   247
   ]
  },
  "qlink_pages": [
@@ -1297,6 +1317,267 @@
     4,
     127
    ]
+  }
+ ],
+ "note_entry": [
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_ADD C3 vel 100 at step 5 (bar 1)",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    16,
+    5,
+    0,
+    60,
+    100,
+    247
+   ],
+   "decoded": {
+    "type": "note_add",
+    "step": 5,
+    "note": 60,
+    "vel": 100
+   },
+   "call": "CreateNoteEvent",
+   "args": [
+    60,
+    1200,
+    0.7874015748031497,
+    240,
+    100
+   ]
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_ADD E3 vel 127 at step 120 (bar 8, step 9)",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    16,
+    120,
+    0,
+    64,
+    127,
+    247
+   ],
+   "decoded": {
+    "type": "note_add",
+    "step": 120,
+    "note": 64,
+    "vel": 127
+   },
+   "call": "CreateNoteEvent",
+   "args": [
+    64,
+    28800,
+    1.0,
+    240,
+    100
+   ]
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_LENGTH step 5 to 4 steps",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    17,
+    5,
+    0,
+    4,
+    247
+   ],
+   "decoded": {
+    "type": "note_length",
+    "step": 5,
+    "len": 4
+   },
+   "call": "SetEventEnd",
+   "endPulses": 2160
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_LENGTH_NUDGE step 5 one longer",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    18,
+    5,
+    0,
+    1,
+    247
+   ],
+   "decoded": {
+    "type": "note_length_nudge",
+    "step": 5,
+    "delta": 1
+   }
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_LENGTH_NUDGE step 5 one shorter",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    18,
+    5,
+    0,
+    127,
+    247
+   ],
+   "decoded": {
+    "type": "note_length_nudge",
+    "step": 5,
+    "delta": -1
+   }
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_CLEAR step 5",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    19,
+    5,
+    0,
+    247
+   ],
+   "decoded": {
+    "type": "note_clear",
+    "step": 5
+   },
+   "call": "DeleteEvent"
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "NOTE_BAR 3 (bar 4)",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    20,
+    3,
+    247
+   ],
+   "decoded": {
+    "type": "note_bar",
+    "bar": 3
+   }
+  },
+  {
+   "dir": "move_to_mpc",
+   "name": "CLIP_CREATE pad 24",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    21,
+    24,
+    247
+   ],
+   "decoded": {
+    "type": "clip_create",
+    "pad": 24
+   }
+  },
+  {
+   "dir": "mpc_to_move",
+   "name": "NOTE_STEPS bar 0: notes on steps 0 and 8, step 8 held through 11",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    75,
+    0,
+    1,
+    2,
+    0,
+    0,
+    28,
+    0,
+    247
+   ],
+   "decoded": {
+    "type": "note_steps",
+    "bar": 0,
+    "on": [
+     0,
+     8
+    ],
+    "cov": [
+     9,
+     10,
+     11
+    ]
+   }
+  },
+  {
+   "dir": "mpc_to_move",
+   "name": "NOTE_STEPS bar 1: step 15 on, nothing covered",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    75,
+    1,
+    0,
+    0,
+    2,
+    0,
+    0,
+    0,
+    247
+   ],
+   "decoded": {
+    "type": "note_steps",
+    "bar": 1,
+    "on": [
+     15
+    ],
+    "cov": []
+   }
+  },
+  {
+   "dir": "mpc_to_move",
+   "name": "NOTE_STEPS bar 7: empty",
+   "wire": [
+    240,
+    125,
+    77,
+    80,
+    75,
+    7,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    247
+   ],
+   "decoded": {
+    "type": "note_steps",
+    "bar": 7,
+    "on": [],
+    "cov": []
+   }
   }
  ]
 }

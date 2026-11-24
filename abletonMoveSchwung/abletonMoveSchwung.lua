@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Ryan Gilmore
 -- abletonMoveSchwung.lua: "Ableton Move (Schwung)", the MPC half of Move MPC Control, a controller script for MPC OS 3.10's
 -- Lua engine. The Ableton Move (running the Move MPC Control Schwung tool) becomes clip
--- launcher, pads and Q-Link knobs. Wire protocol: version 4.
+-- launcher, pads and Q-Link knobs. Wire contract: the wire protocol (v5).
 --
 -- The script is the model, the Move the view. It maps nothing but SysEx until
 -- the Move says HELLO, only ever maps MIDI channel 16, and unmaps everything on
@@ -27,7 +27,7 @@
 local CFG, MSG, CC, MODE, ANIM, CS, COLOUR = {}, {}, {}, {}, {}, {}, {}
 local safety, coords, colourFns, v2 = {}, {}, {}, {}
 
-CFG.PROTOCOL_VERSION      = 4
+CFG.PROTOCOL_VERSION      = 5
 CFG.CH                    = 15     -- MIDI channel 16, 0-based
 CFG.OUT_PORT              = 0      -- output index, order of output= in the .ini
 CFG.LISTENER              = "abletonMoveSchwung" -- listener name for :listen/:stopListening
@@ -41,6 +41,7 @@ CFG.PASSIVE_GOODBYE_MS    = 1000   -- min gap between GOODBYEs answering PINGs w
 CFG.STATE_POLL_MS         = 100    -- STATE and TEXT re-read and diffed
 CFG.GRID_POLL_MS          = 250    -- clip/scene/track cells re-read and diffed
 CFG.PAD_POLL_MS           = 40     -- Pads mode: all 32 pad colours re-read per interval (property reads)
+CFG.NOTE_LOG              = false  -- every v5 note command to the journal ("MOVEPADS note"); was on for the first v5 bench
 CFG.PERF_LOG              = false  -- handler timing to the journal (v2.perfNote); on for an audio-dropout test
 CFG.PERF_LOG_MS           = 10000  -- one perf line this often
 CFG.PERF_SLOW_MS          = 5      -- a handler call this long is listed by name
@@ -56,6 +57,8 @@ CFG.PAD_BURST_MIN_MS      = 500    -- Pads mode: least time between full 32-pad 
 CFG.QLINK_IDLE_POLL_MS    = 125    -- ONE untouched knob per interval (eight = 1 s)
 
 CFG.ARM_POLL_MS           = 1000
+CFG.NOTE_POLL_MS          = 250    -- Notes mode: selected clip re-read this often
+CFG.NOTE_PULSES           = 240    -- one sixteenth, in pulses (960 per quarter; device-proven)
 CFG.POSITION_POLL_MS      = 125
 CFG.NUM_PADS              = 32
 CFG.PADS_PER_MSG          = 8
@@ -90,6 +93,9 @@ MSG.OUT_WELCOME, MSG.OUT_STATE, MSG.OUT_PADS, MSG.OUT_ROWS = 0x41, 0x42, 0x43, 0
 MSG.OUT_STEPS, MSG.OUT_TEXT, MSG.OUT_QLINK, MSG.OUT_GOODBYE = 0x45, 0x46, 0x47, 0x48
 
 MSG.OUT_PONG, MSG.OUT_POSITION = 0x49, 0x4A
+MSG.OUT_NOTE_STEPS = 0x4B
+MSG.IN_NOTE_ADD, MSG.IN_NOTE_LENGTH, MSG.IN_NOTE_NUDGE = 0x10, 0x11, 0x12 -- §12.2
+MSG.IN_NOTE_CLEAR, MSG.IN_NOTE_BAR, MSG.IN_CLIP_CREATE = 0x13, 0x14, 0x15
 
 CC.NAV_LEFT, CC.NAV_RIGHT, CC.NAV_UP, CC.NAV_DOWN = 0x01, 0x02, 0x03, 0x04
 CC.SHIFT, CC.PLAY, CC.REC, CC.UNDO = 0x05, 0x06, 0x07, 0x08
@@ -302,6 +308,20 @@ end
 function enc.qlink(k, name, value)
     return frame(MSG.OUT_QLINK, string.char(b7(k)) .. ascii7(name, CFG.MAX_QLINK_NAME) .. "\0"
         .. ascii7(value, CFG.MAX_QLINK_VALUE))
+end
+
+-- bar 0-7; on, cov: lists of step indices 0-15 in that bar. Each bitmap is
+-- 16 bits as three 7-bit bytes, low first (§12.3).
+function enc.noteSteps(bar, on, cov)
+    local bytes = { b7(bar) }
+    for _, list in ipairs({ on or {}, cov or {} }) do
+        local m = 0
+        for _, i in ipairs(list) do
+            if i >= 0 and i < 16 then m = m | (1 << math.floor(i)) end
+        end
+        bytes[#bytes + 1], bytes[#bytes + 2], bytes[#bytes + 3] = m & 127, (m >> 7) & 127, m >> 14
+    end
+    return frame(MSG.OUT_NOTE_STEPS, string.char(table.unpack(bytes)))
 end
 
 function enc.pong()
@@ -549,6 +569,9 @@ local function virtualPadColour(vp)
 end
 
 v2.seq = { mode = 4, pads = {} }
+-- Note entry (§12). store["c,r"] = list of { note, step, len, vel, ev }: only what
+-- this script wrote, kept across sessions of one MPC run.
+v2.notes = { store = {}, bar = 0, pollAt = -math.huge }
 
 -- The MPC's own pad bank holds the step lights, and it need not be the bank
 -- pair the Move shows. One ~2.9 ms read on entering Step Seq and one a
@@ -1399,6 +1422,7 @@ end
 
 local function resetSession()
     v2.seq.mode = 4
+    v2.notes.bar, v2.notes.key, v2.notes.dirty, v2.notes.pendingSelect, v2.notes.pollAt = 0, nil, false, nil, -math.huge
     v2.available, v2.armAt, v2.armPending = nil, nil, true
     v2.trackIndex, v2.trackName, v2.meta, v2.metaAt = nil, nil, nil, nil
     v2.positionAt, v2.wasPlaying = nil, false
@@ -1454,6 +1478,7 @@ local function goActive()
     v2.trackIndex = safety.read("currentTrack.Index", function() return mpc.tracks.currentTrack.Index.value end)
     v2.trackName = safety.read("currentTrack.Name", function() return mpc.tracks.currentTrack.Name.value end)
     enqueue(enc.welcome(CFG.PROTOCOL_VERSION, clipWorkflowAvailable() and 1 or 0), "welcome", true)
+    v2.notes.key, v2.notes.dirty = nil, true -- the full dump includes NOTE_STEPS
     sync(nil, true)
 end
 
@@ -1991,6 +2016,176 @@ local function handleVoice(kind, channel, num, value)
     end
 end
 
+-----------------------------------------------------------------------------
+-- Note entry from the Move. Target: the MPC's selected clip,
+-- in both workflows; mpc.currentSequence.events writes notes that appear nowhere.
+-----------------------------------------------------------------------------
+
+-- "c,r" of the selected clip (global, 0-based), or nil if it cannot be read.
+function v2.notes.readKey()
+    local c = safety.read("GetSelectedClipColumn", function() return mpc.clipMatrix.GetSelectedClipColumn() end)
+    local r = safety.read("GetSelectedClipRow", function() return mpc.clipMatrix.GetSelectedClipRow() end)
+    if type(c) ~= "number" or type(r) ~= "number" or c < 0 or r < 0 or c % 1 ~= 0 or r % 1 ~= 0 then return nil end
+    return string.format("%d,%d", c, r)
+end
+
+-- key, events of the selected clip; nil (and "No clip" to the Move) if there is none.
+function v2.notes.target()
+    local N = v2.notes
+    local key = N.readKey()
+    local good = key ~= nil
+    -- Without the clip workflow the selected clip is the track's own, always there.
+    if good and clipWorkflowAvailable() then
+        local c, r = key:match("^(%d+),(%d+)$")
+        good = safety.read("HasClip", function() return mpc.clipMatrix.HasClip(tonumber(c), tonumber(r)) end) == true
+    end
+    -- pcall, not read(): a missing selectedClip is an expected "no clip", not a fault
+    local events
+    if good then
+        local okE, e = pcall(function() return mpc.clipMatrix.selectedClip.events end)
+        events = okE and e or nil
+    end
+    if not events then
+        enqueueText(2, "No clip")
+        return nil
+    end
+    if key ~= N.key then N.key = key end
+    return key, events
+end
+
+-- Longest L (steps) for note n: it must end no later than the next stored note
+-- of the same pitch starts.
+function v2.notes.cap(list, n, L)
+    for _, o in ipairs(list) do
+        if o.note == n.note and o.step > n.step and o.step - n.step < L then L = o.step - n.step end
+    end
+    return L
+end
+
+function v2.notes.command(cmd, d)
+    local N = v2.notes
+    if CFG.NOTE_LOG then
+        print(string.format("MOVEPADS note cmd=%02x data=%s mode=%s seq=%s", cmd, table.concat(d, ","), tostring(mode), tostring(v2.seq.mode)))
+    end
+    if cmd == MSG.IN_CLIP_CREATE then return N.create(d[1]) end
+    -- Everything else needs Notes, and an MPC screen that is not Step Seq or a
+    -- mute mode: Main, or any other (Grid View, Clip Matrix, ...: mpcMode 4;
+    -- the first v5 bench, 2026-11-24, found the MPC on those).
+    local m = v2.seq.mode
+    if mode ~= MODE.NOTES or (m ~= 0 and m ~= 4) then return end
+    if cmd == MSG.IN_NOTE_BAR then
+        if d[1] == nil then return end
+        N.bar, N.dirty = math.min(d[1], 7), true
+        return
+    end
+    if d[1] == nil or d[2] == nil then return end
+    local s = d[1] + 128 * d[2]
+    if s > 127 then return end
+    local arg, vel = d[3], d[4]
+    if cmd ~= MSG.IN_NOTE_CLEAR and arg == nil then return end
+    if cmd == MSG.IN_NOTE_ADD and (vel == nil or vel < 1) then return end
+    local key, events = N.target()
+    if CFG.NOTE_LOG then print("MOVEPADS note target key=" .. tostring(key) .. " events=" .. type(events)) end
+    if not key then return end
+    local list = N.store[key] or {}
+    N.store[key] = list
+    local P = CFG.NOTE_PULSES
+    if cmd == MSG.IN_NOTE_ADD then
+        for i = #list, 1, -1 do
+            local o = list[i]
+            if o.step == s and o.note == arg then
+                safety.safe("DeleteEvent", function() return events.DeleteEvent(o.ev) end)
+                table.remove(list, i)
+            end
+        end
+        local ok, ev = safety.safe("CreateNoteEvent", function() return events.CreateNoteEvent(arg, s * P, vel / 127, P, 100) end)
+        if CFG.NOTE_LOG then print("MOVEPADS note CreateNoteEvent ok=" .. tostring(ok) .. " ev=" .. type(ev) .. " last error=" .. tostring(lastError)) end
+        if ok and type(ev) == "string" then list[#list + 1] = { note = arg, step = s, len = 1, vel = vel, ev = ev } end
+    elseif cmd == MSG.IN_NOTE_CLEAR then
+        for i = #list, 1, -1 do
+            local o = list[i]
+            if o.step == s then
+                safety.safe("DeleteEvent", function() return events.DeleteEvent(o.ev) end)
+                table.remove(list, i)
+            end
+        end
+    else -- NOTE_LENGTH, NOTE_LENGTH_NUDGE
+        local delta = arg >= 64 and arg - 128 or arg
+        for _, n in ipairs(list) do
+            if n.step == s then
+                local L = cmd == MSG.IN_NOTE_LENGTH and arg or n.len + delta
+                L = N.cap(list, n, math.max(1, L))
+                local ok, ev = safety.safe("SetEventEnd", function() return events.SetEventEnd(n.ev, (s + L) * P) end)
+                if ok and type(ev) == "string" then n.ev, n.len = ev, L end
+            end
+        end
+    end
+    N.dirty = true
+end
+
+-- CLIP_CREATE: an empty slot under the pad gets a clip; selected on the next tick.
+function v2.notes.create(pad)
+    if mode > MODE.ROWS or pad == nil or pad > CFG.NUM_PADS - 1 then return end
+    local rc, rr = coords.padToClip(mode, pad)
+    local ox = safety.read("OriginX", function() return aperture().OriginX.value end)
+    local oy = safety.read("OriginY", function() return aperture().OriginY.value end)
+    if not rc or type(ox) ~= "number" or type(oy) ~= "number" then return end
+    local c, r = math.floor(ox) + rc, math.floor(oy) + rr
+    local gc = safety.read("GetGlobalColumns", function() return aperture().GetGlobalColumns() end)
+    local gr = safety.read("GetGlobalRows", function() return aperture().GetGlobalRows() end)
+    if type(gc) ~= "number" or type(gr) ~= "number" or c >= gc or r >= gr then return end
+    local has = safety.read("HasClip", function() return mpc.clipMatrix.HasClip(c, r) end)
+    if has ~= false then return end
+    if safety.safe("CreateClip", function() mpc.clipMatrix.CreateClip(c, r) end) then
+        v2.notes.pendingSelect = { c = c, r = r, rc = rc, rr = rr }
+        enqueueText(2, "Clip created")
+    end
+end
+
+-- NOTE_STEPS body for the shown bar from the stored notes of the selected clip.
+function v2.notes.stepsMsg()
+    local N = v2.notes
+    local base = N.bar * 16
+    local on, cov = {}, {}
+    for _, n in ipairs(N.store[N.key or ""] or {}) do
+        local i = n.step - base
+        if i >= 0 and i < 16 then on[i] = true end
+        for j = math.max(i + 1, 0), math.min(i + n.len - 1, 15) do cov[j] = true end
+    end
+    local onL, covL = {}, {}
+    for i = 0, 15 do
+        if on[i] then onL[#onL + 1] = i end
+        if cov[i] then covL[#covL + 1] = i end
+    end
+    return enc.noteSteps(N.bar, onL, covL)
+end
+
+-- Per tick: select a clip just created, notice a changed selection, answer a
+-- pending NOTE_STEPS. At most one native read pair and one message per tick.
+function v2.notes.work(now)
+    local N = v2.notes
+    local p = N.pendingSelect
+    if p then
+        N.pendingSelect = nil
+        safety.safe("SelectClip", function() mpc.clipMatrix.SelectClip(p.c, p.r) end)
+        -- as DUP_CLIP: the aperture's own SelectClip is what a pad press uses
+        safety.safe("aperture.SelectClip", function() aperture().SelectClip(p.rc, p.rr) end)
+        N.key, N.dirty = nil, true
+        dirty.grid = true
+        return
+    end
+    if mode == MODE.NOTES and now - N.pollAt >= CFG.NOTE_POLL_MS then
+        N.pollAt = now
+        local key = N.readKey()
+        if key ~= N.key then N.key, N.dirty = key, true end
+    end
+    if N.dirty then
+        N.dirty = false
+        if N.key == nil then N.key = N.readKey() end
+        enqueue(N.stepsMsg(), "notesteps")
+    end
+end
+
 local function handleSysex(bytes)
     local cmd, data = parseSysex(bytes)
     if not cmd then return end
@@ -2017,6 +2212,8 @@ local function handleSysex(bytes)
         end
     elseif cmd == MSG.IN_BYE then
         goPassive("bye")
+    elseif cmd >= MSG.IN_NOTE_ADD and cmd <= MSG.IN_CLIP_CREATE then
+        if active then v2.notes.command(cmd, data) end
     end
     -- anything else, including the reserved 0x60-0x6F: ignored (§5, §7)
 end
@@ -2039,6 +2236,7 @@ local function handleTimer()
     if needFull then
         needFull = false
         lastPoll.cacheKey = nil
+        v2.notes.key, v2.notes.dirty = nil, true
         sync(nil, true)
     else
         local parts = { state = dirty.state, grid = dirty.grid, text = dirty.text }
@@ -2073,6 +2271,7 @@ local function handleTimer()
         if parts.steps and now - (v2.seq.bankAt or -math.huge) >= 1000 then v2.seq.readBank() end
         if parts.state or parts.grid or parts.text or parts.steps then sync(parts) end
     end
+    safety.safe("notes.work", v2.notes.work, now)
     if now - lastPoll.qlink >= CFG.QLINK_POLL_MS then
         lastPoll.qlink = now
         for k in pairs(touched) do safety.safe("poll.qlink", sendQLink, k, true) end

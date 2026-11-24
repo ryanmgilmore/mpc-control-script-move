@@ -95,12 +95,13 @@ local function load(opts)
     -- The lane poll (pads.LastHitPad in Step Seq) is off unless a test asks for it.
     w.I.cfg.LANE_POLL = opts and opts.lanePoll and true or false
     w.I.cfg.PERF_LOG = opts and opts.perfLog and true or false -- device diagnostics, off in tests
+    w.I.cfg.NOTE_LOG = false -- device diagnostics, off in tests
     w.I.cfg.QUANT_WAIT_TICKS = 1 -- the quantise tests are written for one tick each way
     w.dev.OnLoad()
     return w
 end
 
-local HELLO = { 0xF0, 0x7D, 0x4D, 0x50, 0x01, 0x04, 0x00, 0xF7 }
+local HELLO = { 0xF0, 0x7D, 0x4D, 0x50, 0x01, 0x05, 0x00, 0xF7 }
 local PING = { 0xF0, 0x7D, 0x4D, 0x50, 0x02, 0xF7 }
 local BYE = { 0xF0, 0x7D, 0x4D, 0x50, 0x03, 0xF7 }
 
@@ -264,7 +265,7 @@ end)
 test("HELLO -> WELCOME then full dump: STATE, PADS x4, ROWS, STEPS x2, TEXT", function()
     local w = load()
     local msgs = connect(w)
-    bytesEq(msgs[1], body(vector("mpc_to_move", "welcome v4, clip workflow available").wire), "WELCOME first")
+    bytesEq(msgs[1], body(vector("mpc_to_move", "welcome v5, clip workflow available").wire), "WELCOME first")
     eq(cmdOf(msgs[2]), 0x42, "STATE second")
     eq(#ofCmd(msgs, 0x43), 4, "PADS messages")
     for i, m in ipairs(ofCmd(msgs, 0x43)) do
@@ -288,13 +289,13 @@ end)
 test("WELCOME flags clear without clip workflow; defaults to Pads mode", function()
     local w = load({ noClipWorkflow = true })
     local msgs = connect(w)
-    bytesEq(msgs[1], string.char(0x7D, 0x4D, 0x50, 0x41, 4, 0), "WELCOME no clip workflow")
+    bytesEq(msgs[1], string.char(0x7D, 0x4D, 0x50, 0x41, 5, 0), "WELCOME no clip workflow")
     eq(w.I.status().mode, 2, "mode")
     noErrors(w)
 end)
 
-test("HELLO v1/v2/v3 -> GOODBYE and passive, including an active session", function()
-    for _, ver in ipairs({1, 2, 3}) do
+test("HELLO v1/v2/v3/v4 -> GOODBYE and passive, including an active session", function()
+    for _, ver in ipairs({1, 2, 3, 4}) do
         for _, activeFirst in ipairs({false, true}) do
             local w = load()
             if activeFirst then connect(w) end
@@ -1652,7 +1653,7 @@ test("vectors: every mpc_to_move message is produced byte-exactly by its encoder
         ["state: muted"] = function(d) return E.state(d) end,
         ["state: solo"] = function(d) return E.state(d) end,
         ["state: mute solo arm"] = function(d) return E.state(d) end,
-        ["welcome v4, clip workflow available"] = function() return E.welcome(4, 1) end,
+        ["welcome v5, clip workflow available"] = function() return E.welcome(5, 1) end,
         ["state: Session, qlink page 0, bank 0, playing, origin 2,5, matrix 16x32, can move left+right+down"] = function(d)
             return E.state(d)
         end,
@@ -1731,7 +1732,7 @@ test("parser: header check, F0/F7 tolerated, short and unknown ignored", functio
     local w = load()
     local P = w.I.parseSysex
     local cmd, data = P(body(HELLO))
-    eq(cmd, 1, "cmd"); eq(data[1], 4, "ver"); eq(data[2], 0, "caps")
+    eq(cmd, 1, "cmd"); eq(data[1], 5, "ver"); eq(data[2], 0, "caps")
     cmd = P(string.char(0xF0, 0x7D, 0x4D, 0x50, 0x02, 0xF7))
     eq(cmd, 2, "with F0/F7")
     eq(P(string.char(0x7E, 0x4D, 0x50, 0x02)), nil, "wrong header")
@@ -3122,6 +3123,319 @@ test("Transposed step lights: each scene on the odd step under its column, even 
     for _, i in ipairs({1, 3, 5, 9, 11, 13}) do ledEq(st[i], 0, 0, 0, 0, "even step " .. (i + 1) .. " dark") end
     ledEq(st[15], 127, 0, 0, 1, "step 16 stop all")
     noErrors(w)
+end)
+
+
+-----------------------------------------------------------------------------
+-- Protocol v5: note entry and clip creation
+-----------------------------------------------------------------------------
+
+local function sx(...)
+    local t = { 0xF0, 0x7D, 0x4D, 0x50 }
+    for _, b in ipairs({ ... }) do t[#t + 1] = b end
+    t[#t + 1] = 0xF7
+    return t
+end
+local function stepLo(s) return s % 128, s // 128 end
+local function addNote(w, s, note, vel) local lo, hi = stepLo(s); w.wire(sx(0x10, lo, hi, note, vel or 100)) end
+local function setLen(w, s, len) local lo, hi = stepLo(s); w.wire(sx(0x11, lo, hi, len)) end
+local function nudge(w, s, d) local lo, hi = stepLo(s); w.wire(sx(0x12, lo, hi, d & 127)) end
+local function clearStep(w, s) local lo, hi = stepLo(s); w.wire(sx(0x13, lo, hi)) end
+
+-- Connected, in Notes mode on Main, with a clip at (2,1) selected.
+local function notesWorld(opts)
+    local w = load(opts)
+    w.setCell(2, 1, 0, 2)
+    w.selectedCol, w.selectedRow = 2, 1
+    connect(w)
+    mock.set(w.currentTrack.Type, "Plugin"); w.wire(cc(0x30, 3)); w.tick(3)
+    eq(w.I.status().mode, 3, "Notes mode")
+    w.takeSysex(); w.clearCalls()
+    return w
+end
+
+local function noteSteps(msgs) return ofCmd(msgs, 0x4B) end
+
+test("v5 note_entry vectors: each wire makes the documented call", function()
+    local w = notesWorld()
+    for _, v in ipairs(vectors.note_entry) do
+        if v.dir == "move_to_mpc" and v.call then
+            w.clearCalls()
+            if v.call == "SetEventEnd" or v.call == "DeleteEvent" then addNote(w, 5, 60, 100); w.clearCalls() end
+            w.wire(v.wire); w.tick(1)
+            local calls = w.callsNamed(v.call)
+            eq(#calls, 1, v.name .. ": one " .. v.call)
+            if v.call == "CreateNoteEvent" then
+                for i, a in ipairs(v.args) do eq(calls[1][i], a, v.name .. " arg " .. i) end
+                eq(#calls[1], #v.args, v.name .. " arg count")
+            elseif v.call == "SetEventEnd" then
+                eq(calls[1][2], v.endPulses, v.name .. " endPulses")
+            end
+            if v.call ~= "CreateNoteEvent" then clearStep(w, 5) end
+        end
+    end
+    eq(w.staleEvents, 0, "no stale string used")
+    noErrors(w)
+end)
+
+test("v5 note_entry vectors: NOTE_STEPS encoder is byte-exact, and the script produces the same from stored notes", function()
+    local w = notesWorld()
+    local E = w.I.enc
+    for _, v in ipairs(vectors.note_entry) do
+        if v.dir == "mpc_to_move" then bytesEq(E.noteSteps(v.decoded.bar, v.decoded.on, v.decoded.cov), body(v.wire), v.name) end
+    end
+    local bar0, bar1, bar7 = vectors.note_entry[9], vectors.note_entry[10], vectors.note_entry[11]
+    addNote(w, 0, 60); addNote(w, 8, 62); setLen(w, 8, 4); addNote(w, 31, 64)
+    w.tick(1)
+    bytesEq(lastOf(noteSteps(w.takeSysex()), 0x4B), body(bar0.wire), "bar 0 from the script")
+    w.wire(sx(0x14, 1)); w.tick(1)
+    bytesEq(lastOf(w.takeSysex(), 0x4B), body(bar1.wire), "bar 1 on NOTE_BAR")
+    w.wire(sx(0x14, 7)); w.tick(1)
+    bytesEq(lastOf(w.takeSysex(), 0x4B), body(bar7.wire), "bar 7 empty")
+    noErrors(w)
+end)
+
+test("v5 NOTE_STEPS: cov crosses a bar boundary; a note's own start step is not cov", function()
+    local w = notesWorld()
+    addNote(w, 14, 60); setLen(w, 14, 5)   -- steps 14..18
+    w.tick(1)
+    local m = lastOf(w.takeSysex(), 0x4B)
+    bytesEq(m, w.I.enc.noteSteps(0, { 14 }, { 15 }), "bar 0: on 14, cov 15")
+    w.wire(sx(0x14, 1)); w.tick(1)
+    bytesEq(lastOf(w.takeSysex(), 0x4B), w.I.enc.noteSteps(1, {}, { 0, 1, 2 }), "bar 1: cov 16..18 = 0..2")
+    noErrors(w)
+end)
+
+test("v5 handles: every edit uses the newest string; delete after SetEventEnd works", function()
+    local w = notesWorld()
+    addNote(w, 4, 60)
+    setLen(w, 4, 3); setLen(w, 4, 2); nudge(w, 4, 1)
+    local live = w.notesOf(2, 1)
+    eq(#live, 1, "one note"); eq(live[1].len, 3 * 240, "length 2 + 1 steps")
+    clearStep(w, 4)
+    eq(#w.notesOf(2, 1), 0, "deleted with the newest string")
+    eq(w.staleEvents, 0, "never a stale string")
+    noErrors(w)
+end)
+
+test("v5 NOTE_ADD: same step and pitch replaces, other pitch stacks; velocity is vel/127", function()
+    local w = notesWorld()
+    addNote(w, 3, 60, 127); addNote(w, 3, 64, 64); addNote(w, 3, 60, 32)
+    local live = w.notesOf(2, 1)
+    eq(#live, 2, "two notes: 60 replaced, 64 kept")
+    eq(live[1].note, 60, "pitch"); eq(live[1].vel, 32 / 127, "replacement velocity"); eq(live[1].len, 240, "fresh length")
+    eq(live[2].note, 64, "other pitch kept")
+    eq(#w.callsNamed("DeleteEvent"), 1, "one delete")
+    eq(w.staleEvents, 0, "stale")
+    noErrors(w)
+end)
+
+test("v5 NOTE_LENGTH: capped at the next stored note of the same pitch only; nudge clamps at 1 and caps", function()
+    local w = notesWorld()
+    addNote(w, 5, 60); addNote(w, 9, 60); addNote(w, 7, 62); addNote(w, 5, 65)
+    setLen(w, 5, 20)
+    local ends = {}
+    for _, n in ipairs(w.notesOf(2, 1)) do if n.time == 5 * 240 then ends[n.note] = (n.time + n.len) // 240 end end
+    eq(ends[60], 9, "60 capped at the next 60 (step 9)")
+    eq(ends[65], 25, "65 not capped by other pitches")
+    nudge(w, 5, 64 + 1)               -- delta -63 from len 4 (60) / 20 (65)
+    ends = {}
+    for _, n in ipairs(w.notesOf(2, 1)) do if n.time == 5 * 240 then ends[n.note] = (n.time + n.len) // 240 end end
+    eq(ends[60], 6, "60 clamped at one step"); eq(ends[65], 6, "65 clamped at one step")
+    nudge(w, 5, 1); nudge(w, 5, 1); nudge(w, 5, 1); nudge(w, 5, 1); nudge(w, 5, 1)
+    ends = {}
+    for _, n in ipairs(w.notesOf(2, 1)) do if n.time == 5 * 240 then ends[n.note] = (n.time + n.len) // 240 end end
+    eq(ends[60], 9, "60 nudged up but capped at step 9"); eq(ends[65], 11, "65 keeps its own length")
+    nudge(w, 5, 127)
+    eq(w.notesOf(2, 1)[1].len > 0, true, "positive length")
+    eq(w.staleEvents, 0, "stale")
+    noErrors(w)
+end)
+
+test("v5 NOTE_CLEAR: deletes every stored note at the step, forgets them, leaves others", function()
+    local w = notesWorld()
+    addNote(w, 2, 60); addNote(w, 2, 64); addNote(w, 3, 60)
+    clearStep(w, 2)
+    local live = w.notesOf(2, 1)
+    eq(#live, 1, "one left"); eq(live[1].time, 3 * 240, "the other step")
+    clearStep(w, 2)
+    eq(#w.callsNamed("DeleteEvent"), 2, "nothing more to delete")
+    w.takeSysex(); w.tick(1)
+    w.wire(sx(0x14, 0)); w.tick(1)
+    bytesEq(lastOf(w.takeSysex(), 0x4B), w.I.enc.noteSteps(0, { 3 }, {}), "steps show only the survivor")
+    noErrors(w)
+end)
+
+test("v5 stores are per clip: a note on another clip is neither shown nor edited", function()
+    local w = notesWorld()
+    addNote(w, 1, 60)
+    w.setCell(3, 0, 0, 2); w.selectedCol, w.selectedRow = 3, 0
+    addNote(w, 1, 60); setLen(w, 1, 5)
+    eq(#w.notesOf(3, 0), 1, "second clip"); eq(#w.notesOf(2, 1), 1, "first clip")
+    eq(w.notesOf(2, 1)[1].len, 240, "first clip's note untouched")
+    noErrors(w)
+end)
+
+test("v5 No clip: HasClip false or selection unreadable does nothing but TEXT slot 2", function()
+    local w = notesWorld()
+    w.selectedCol, w.selectedRow = 5, 5      -- no clip there
+    addNote(w, 1, 60); setLen(w, 1, 2); clearStep(w, 1)
+    w.tick(1)
+    local msgs = w.takeSysex()
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "no create"); eq(#w.callsNamed("SetEventEnd"), 0, "no length")
+    eq(#noteSteps(msgs), 0, "no NOTE_STEPS")
+    local t = ofCmd(msgs, 0x46)
+    eq(t[#t]:byte(5), 2, "slot 2"); eq(t[#t]:sub(6), "No clip", "text")
+    -- selection unreadable
+    w.selectedCol = nil; w.clearCalls()
+    addNote(w, 1, 60); w.tick(1)
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "unreadable: no create")
+    t = ofCmd(w.takeSysex(), 0x46)
+    eq(t[#t]:sub(6), "No clip", "unreadable: text")
+    -- no selectedClip object
+    w.selectedCol, w.selectedRow, w.noSelectedClip = 2, 1, true
+    addNote(w, 1, 60); w.tick(1)
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "no events object: no create")
+    noErrors(w)
+end)
+
+test("v5 without the clip workflow the selected clip needs no HasClip", function()
+    local w = load({ noClipWorkflow = true })
+    connect(w)
+    mock.set(w.currentTrack.Type, "Plugin"); w.wire(cc(0x30, 3)); w.tick(3)
+    eq(w.I.status().mode, 3, "Notes")
+    w.clearCalls()
+    addNote(w, 0, 60)
+    eq(#w.callsNamed("CreateNoteEvent"), 1, "created")
+    eq(#w.callsNamed("HasClip"), 0, "HasClip not asked")
+    noErrors(w)
+end)
+
+test("v5 note commands are ignored outside Notes mode, in Step Seq and the mute modes; honoured on Main and other screens", function()
+    local w = load()
+    w.setCell(2, 1, 0, 2); w.selectedCol, w.selectedRow = 2, 1
+    connect(w)
+    addNote(w, 1, 60)                        -- Matrix
+    w.wire(cc(0x30, 2)); w.tick(3)           -- Pads (drum track)
+    addNote(w, 1, 60); w.wire(sx(0x14, 2)); setLen(w, 1, 3); clearStep(w, 1)
+    mock.set(w.currentTrack.Type, "Plugin"); w.wire(cc(0x30, 3)); w.tick(3)
+    mock.set(w.mpc.engineMode.CurrentMode, "Step Sequencer"); w.tick(3)
+    eq(w.I.status().mpcMode, 1, "Step Seq")
+    w.takeSysex()
+    addNote(w, 1, 60); w.wire(sx(0x14, 2)); w.tick(2)
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "nothing created")
+    eq(#w.callsNamed("DeleteEvent") + #w.callsNamed("SetEventEnd"), 0, "nothing edited")
+    eq(#noteSteps(w.takeSysex()), 0, "no NOTE_STEPS answers")
+    mock.set(w.mpc.engineMode.CurrentMode, "Track Mute"); w.tick(3)
+    addNote(w, 1, 60)
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "Track Mute: ignored")
+    mock.set(w.mpc.engineMode.CurrentMode, "Grid View"); w.tick(3)
+    eq(w.I.status().mpcMode, 4, "another screen")
+    addNote(w, 1, 60)
+    eq(#w.callsNamed("CreateNoteEvent"), 1, "Grid View (mpcMode 4): honoured (first v5 bench)")
+    mock.set(w.mpc.engineMode.CurrentMode, "Main Mode"); w.tick(3)
+    addNote(w, 3, 60)
+    eq(#w.callsNamed("CreateNoteEvent"), 2, "back on Main: honoured")
+    -- passive: ignored too
+    w.wire(BYE); w.clearCalls(); addNote(w, 2, 60)
+    eq(#w.callsNamed("CreateNoteEvent"), 0, "passive")
+    noErrors(w)
+end)
+
+test("v5 WELCOME dump carries NOTE_STEPS for bar 0; a burst of edits in one tick answers once", function()
+    local w = load()
+    local msgs = connect(w)
+    eq(#noteSteps(msgs), 1, "one NOTE_STEPS in the dump")
+    bytesEq(noteSteps(msgs)[1], w.I.enc.noteSteps(0, {}, {}), "empty, bar 0")
+    w.setCell(2, 1, 0, 2); w.selectedCol, w.selectedRow = 2, 1
+    mock.set(w.currentTrack.Type, "Plugin"); w.wire(cc(0x30, 3)); w.tick(3); w.takeSysex()
+    addNote(w, 0, 60); addNote(w, 1, 60); setLen(w, 0, 1); addNote(w, 2, 60)
+    w.tick(1)
+    local got = noteSteps(w.takeSysex())
+    eq(#got, 1, "one answer for the burst")
+    bytesEq(got[1], w.I.enc.noteSteps(0, { 0, 1, 2 }, {}), "all three")
+    w.wire(cc(0x33, 127)); w.tick(10)
+    eq(#noteSteps(w.takeSysex()), 1, "REFRESH re-sends it")
+    noErrors(w)
+end)
+
+test("v5 a changed selected clip is noticed within 250 ms in Notes mode and answered with NOTE_STEPS", function()
+    local w = notesWorld()
+    addNote(w, 6, 60); w.tick(1); w.takeSysex()
+    w.setCell(3, 0, 0, 2)
+    w.selectedCol, w.selectedRow = 3, 0
+    w.tick(14)
+    local got = noteSteps(w.takeSysex())
+    eq(#got, 1, "one answer")
+    bytesEq(got[1], w.I.enc.noteSteps(0, {}, {}), "the other clip is empty")
+    w.selectedCol, w.selectedRow = 2, 1
+    w.tick(14)
+    got = noteSteps(w.takeSysex())
+    bytesEq(got[#got], w.I.enc.noteSteps(0, { 6 }, {}), "back to the first clip: its note")
+    w.tick(30)
+    eq(#noteSteps(w.takeSysex()), 0, "no change, no message")
+    -- not polled outside Notes mode
+    w.wire(cc(0x30, 0)); w.tick(3); w.takeSysex(); w.clearCalls()
+    w.selectedCol, w.selectedRow = 3, 0
+    w.tick(30)
+    eq(#noteSteps(w.takeSysex()), 0, "Matrix: no NOTE_STEPS")
+    eq(#w.callsNamed("GetSelectedClipColumn"), 0, "Matrix: selection not polled")
+    noErrors(w)
+end)
+
+test("v5 CLIP_CREATE: empty slot under the pad in global coordinates, selected one tick later", function()
+    local w = load()
+    connect(w)
+    w.moveTo(2, 4); w.tick(2); w.takeSysex(); w.clearCalls()
+    local v = vector("note_entry", "CLIP_CREATE pad 24")
+    w.wire(v.wire)
+    local cr = w.callsNamed("CreateClip")
+    eq(#cr, 1, "CreateClip"); eq(cr[1][1], 2, "global column (origin 2 + 0)"); eq(cr[1][2], 4, "global row (origin 4 + 0)")
+    eq(#w.callsNamed("clipMatrix.SelectClip"), 0, "not selected in the same tick")
+    w.tick(1)
+    local sel = w.callsNamed("clipMatrix.SelectClip")
+    eq(#sel, 1, "selected on the next tick"); eq(sel[1][1], 2, "col"); eq(sel[1][2], 4, "row")
+    eq(w.selectedCol, 2, "selection moved"); eq(w.selectedRow, 4, "selection moved")
+    local t = ofCmd(w.takeSysex(), 0x46)
+    eq(t[#t]:sub(6), "Clip created", "text"); eq(t[#t]:byte(5), 2, "slot 2")
+    -- now there is a clip: nothing more
+    w.clearCalls(); w.wire(v.wire); w.tick(2)
+    eq(#w.callsNamed("CreateClip"), 0, "slot with a clip: nothing")
+    eq(#w.callsNamed("clipMatrix.SelectClip"), 0, "and no selection")
+    -- Pad outside the matrix, and a pad above 31
+    w.moveTo(8, 28)
+    w.wire(sx(0x15, 0)); w.wire(sx(0x15, 40))
+    eq(#w.callsNamed("CreateClip") <= 1, true, "bounded")
+    noErrors(w)
+end)
+
+test("v5 CLIP_CREATE: Transposed maps through the same coordinates; never in Notes or Pads mode", function()
+    local w = load()
+    connect(w)
+    w.wire(cc(0x30, 1)); w.tick(3)
+    w.moveTo(3, 5); w.tick(2); w.clearCalls()
+    w.wire(sx(0x15, 2 * 8 + 1))               -- row 2, col 1 -> track column 3-2, scene row 1
+    local cr = w.callsNamed("CreateClip")
+    eq(#cr, 1, "CreateClip"); eq(cr[1][1], 3 + 1, "column"); eq(cr[1][2], 5 + 1, "row")
+    w.tick(1)
+    eq(#w.callsNamed("clipMatrix.SelectClip"), 1, "selected")
+    mock.set(w.currentTrack.Type, "Plugin"); w.wire(cc(0x30, 3)); w.tick(3); w.clearCalls()
+    w.wire(sx(0x15, 5)); w.tick(2)
+    eq(#w.callsNamed("CreateClip"), 0, "not in Notes")
+    w.wire(cc(0x30, 2)); w.tick(3); w.clearCalls()
+    w.wire(sx(0x15, 5)); w.tick(2)
+    eq(#w.callsNamed("CreateClip"), 0, "not in Pads")
+    noErrors(w)
+end)
+
+test("v5 CLIP_CREATE does not set a clip length and survives a failing CreateClip", function()
+    local w = load()
+    connect(w); w.clearCalls()
+    w.createClipFails = true
+    w.wire(sx(0x15, 0)); w.tick(2)
+    eq(#w.callsNamed("clipMatrix.SelectClip"), 0, "no selection after a failure")
+    for _, c in ipairs(w.calls) do ok(not c.name:match("^Set.*Length") and not c.name:match("^SetClip"), "length call: " .. c.name) end
+    w.errorsOk = true
 end)
 
 print(string.format("\n%d passed, %d failed, %d checks", passed, failed, checks))
